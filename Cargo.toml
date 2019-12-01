@@ -1,0 +1,14 @@
+[package]
+name = "advent_of_code2019"
+version = "0.1.0"
+authors = ["Fredrik Jansson <frjansso@cisco.com>"]
+edition = "2018"
+
+[dependencies]
+combine = "*"
+regex = "*"
+lazy_static = "*"
+nom = "5"
+chrono = "*"
+rayon = "1"
+pathfinding = "^1"
