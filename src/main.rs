@@ -1,10 +1,7 @@
-extern crate regex;
-#[macro_use]
-extern crate lazy_static;
-
 use std::env;
 
 mod aoc1;
+mod aoc2;
 // mod aoc10;
 // mod aoc11;
 // mod aoc12;
@@ -40,7 +37,7 @@ fn main() {
 
     match day {
         1 => aoc1::run(),
-        // 2 => aoc2::run(),
+        2 => aoc2::run(),
         // 3 => aoc3::run(),
         // 4 => aoc4::run(),
         // 5 => aoc5::run(),
