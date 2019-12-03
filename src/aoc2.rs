@@ -64,10 +64,10 @@ fn run_program(data: &mut [usize], return_idx: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn aoc2_parse() {
+        use super::*;
         let input = "1,0,0,0,99";
         let (_, input) = parse_input(input).unwrap();
         assert_eq!(5, input.len());
@@ -75,6 +75,7 @@ mod tests {
 
     #[test]
     fn aoc2_run_program() {
+        use super::*;
         let input = "1,0,0,0,99";
         let (_, mut input) = parse_input(input).unwrap();
         assert_eq!(2, run_program(&mut input, 0));

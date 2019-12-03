@@ -45,10 +45,10 @@ fn run_2(input: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn aoc1_fuel_1() {
+        use super::*;
         assert_eq!(2, fuel_1(&12));
         assert_eq!(2, fuel_1(&14));
         assert_eq!(654, fuel_1(&1969));
@@ -57,6 +57,7 @@ mod tests {
 
     #[test]
     fn aoc1_fuel_2() {
+        use super::*;
         assert_eq!(2, fuel_2(&14));
         assert_eq!(966, fuel_2(&1969));
         assert_eq!(50346, fuel_2(&100756));

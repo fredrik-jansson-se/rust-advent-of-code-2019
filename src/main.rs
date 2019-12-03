@@ -9,7 +9,7 @@ mod aoc2;
 // mod aoc14;
 // mod aoc15;
 // mod aoc16;
-// mod aoc3;
+mod aoc3;
 // mod aoc4;
 // mod aoc5;
 // mod aoc6;
@@ -38,7 +38,7 @@ fn main() {
     match day {
         1 => aoc1::run(),
         2 => aoc2::run(),
-        // 3 => aoc3::run(),
+        3 => aoc3::run(),
         // 4 => aoc4::run(),
         // 5 => aoc5::run(),
         // 6 => aoc6::run(),
