@@ -63,6 +63,10 @@ impl Point {
             },
         }
     }
+
+    fn distance(&self, o: &Self) -> isize {
+        (self.x - o.x).abs() + (self.y - o.y).abs()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -161,8 +165,35 @@ fn run_1(wires: &[Vec<Direction>]) -> isize {
     closest.unwrap()
 }
 
-fn run_2(_input: &[Vec<Direction>]) -> u32 {
-    0
+fn run_2(wires: &[Vec<Direction>]) -> isize {
+    let lines = wires
+        .iter()
+        .map(|w| wire_dir_to_lines(Point { x: 0, y: 0 }, w))
+        .collect::<Vec<Vec<Line>>>();
+
+    let mut l1_len = 0;
+
+    let mut min_len = std::isize::MAX;
+
+    for l1 in &lines[0] {
+        let mut l2_len = 0;
+        for l2 in &lines[1] {
+            match l1.intersect(&l2) {
+                None => (),
+                Some(p) => {
+                    min_len = isize::min(
+                        l1_len + l2_len + l1.p1.distance(&p) + l2.p1.distance(&p),
+                        min_len,
+                    );
+                }
+            }
+
+            l2_len += l2.len();
+        }
+        l1_len += l1.len();
+    }
+
+    min_len
 }
 
 #[cfg(test)]
