@@ -10,7 +10,7 @@ mod aoc2;
 // mod aoc15;
 // mod aoc16;
 mod aoc3;
-// mod aoc4;
+mod aoc4;
 // mod aoc5;
 // mod aoc6;
 // mod aoc7;
@@ -39,7 +39,7 @@ fn main() {
         1 => aoc1::run(),
         2 => aoc2::run(),
         3 => aoc3::run(),
-        // 4 => aoc4::run(),
+        4 => aoc4::run(),
         // 5 => aoc5::run(),
         // 6 => aoc6::run(),
         // 7 => aoc7::run(),
