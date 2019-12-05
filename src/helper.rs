@@ -27,9 +27,9 @@ pub fn usize_val(i: &str) -> IResult<&str, usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn helper_parse_int32() {
+        use super::*;
         assert_eq!(i32_val("123"), Ok(("", 123)));
         assert_eq!(i32_val("+123"), Ok(("", 123)));
         assert_eq!(i32_val("-123"), Ok(("", -123)));
@@ -37,6 +37,7 @@ mod tests {
 
     #[test]
     fn helper_parse_uint32() {
+        use super::*;
         assert_eq!(u32_val("123"), Ok(("", 123)));
     }
 }
