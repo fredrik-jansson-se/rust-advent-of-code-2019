@@ -8,7 +8,7 @@ pub fn run() {
     println!("day7-2: {}", run_2(&input));
 }
 
-fn run_amp_1(program: &str, phases: &[i32]) -> i32 {
+fn run_amp_1(program: &str, phases: &[i64]) -> i64 {
     let mut io = 0;
 
     for p in phases {
@@ -20,7 +20,7 @@ fn run_amp_1(program: &str, phases: &[i32]) -> i32 {
     io
 }
 
-pub fn run_1(input: &str) -> i32 {
+pub fn run_1(input: &str) -> i64 {
     let mut data = [0, 1, 2, 3, 4];
     let heap = Heap::new(&mut data);
     let phases = heap.collect::<Vec<_>>();
@@ -32,11 +32,11 @@ pub fn run_1(input: &str) -> i32 {
         .unwrap()
 }
 
-fn run_amp_2(program: &str, phases: &[i32]) -> i32 {
+fn run_amp_2(program: &str, phases: &[i64]) -> i64 {
     let mut amps = (0..5)
         .map(|_| super::intcode::CPU::new(program))
         .collect::<Vec<_>>();
-    let mut inputs: Vec<Vec<i32>> = phases.iter().map(|p| vec![*p]).collect::<Vec<_>>();
+    let mut inputs: Vec<Vec<i64>> = phases.iter().map(|p| vec![*p]).collect::<Vec<_>>();
     // Initial input for amp A
     inputs[0].push(0);
 
@@ -52,7 +52,7 @@ fn run_amp_2(program: &str, phases: &[i32]) -> i32 {
     }
 }
 
-pub fn run_2(input: &str) -> i32 {
+pub fn run_2(input: &str) -> i64 {
     let mut data = [5, 6, 7, 8, 9];
     let heap = Heap::new(&mut data);
     let phases = heap.collect::<Vec<_>>();

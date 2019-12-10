@@ -12,9 +12,21 @@ fn signed_to_val(s: (Option<&str>, &str)) -> Result<i32, std::num::ParseIntError
     }
 }
 
+fn signed_to_val64(s: (Option<&str>, &str)) -> Result<i64, std::num::ParseIntError> {
+    match s.0 {
+        Some("-") => s.1.parse::<i64>().map(|v| -v),
+        _ => s.1.parse::<i64>(),
+    }
+}
+
 pub fn i32_val(i: &str) -> IResult<&str, i32> {
     let a = alt((tag("-"), tag("+")));
     map_res(pair(opt(a), digit1), signed_to_val)(i)
+}
+
+pub fn i64_val(i: &str) -> IResult<&str, i64> {
+    let a = alt((tag("-"), tag("+")));
+    map_res(pair(opt(a), digit1), signed_to_val64)(i)
 }
 
 pub fn u32_val(i: &str) -> IResult<&str, u32> {

@@ -1,23 +1,23 @@
 use super::helper::*;
-use nom::bytes::complete::tag;
-use nom::multi::separated_nonempty_list;
-use nom::IResult;
+use nom::{bytes::complete::tag, multi::separated_nonempty_list, IResult};
 
-fn parse_program(i: &str) -> IResult<&str, Vec<i32>> {
-    separated_nonempty_list(tag(","), i32_val)(i)
+fn parse_program(i: &str) -> IResult<&str, Vec<i64>> {
+    separated_nonempty_list(tag(","), i64_val)(i)
 }
 
 #[derive(Debug, PartialEq)]
 enum ParameterMode {
     Position,
     Immediate,
+    Relative,
 }
 
 impl ParameterMode {
-    fn from_int(i: i32) -> Self {
+    fn from_int(i: i64) -> Self {
         match i {
             0 => Self::Position,
             1 => Self::Immediate,
+            2 => Self::Relative,
             _ => unreachable!(),
         }
     }
@@ -33,11 +33,12 @@ enum Op {
     JumpIfFalse,
     LT,
     Eq,
+    AdjRelBase,
     End,
 }
 
 impl Op {
-    fn from_int(i: i32) -> Self {
+    fn from_int(i: i64) -> Self {
         match i {
             1 => Self::Add,
             2 => Self::Mul,
@@ -47,6 +48,7 @@ impl Op {
             6 => Self::JumpIfFalse,
             7 => Self::LT,
             8 => Self::Eq,
+            9 => Self::AdjRelBase,
             99 => Self::End,
             x => {
                 dbg! {x};
@@ -56,7 +58,7 @@ impl Op {
     }
 }
 
-fn parse_op_code(code: i32) -> (Op, ParameterMode, ParameterMode, ParameterMode) {
+fn parse_op_code(code: i64) -> (Op, ParameterMode, ParameterMode, ParameterMode) {
     let op = Op::from_int(code % 100);
     let m1 = ParameterMode::from_int((code / 100) % 10);
     let m2 = ParameterMode::from_int((code / 1000) % 10);
@@ -73,8 +75,9 @@ pub enum State {
 
 pub struct CPU {
     pc: usize,
-    pub memory: Vec<i32>,
-    pub output: Vec<i32>,
+    relative_base: i64,
+    pub memory: Vec<i64>,
+    pub output: Vec<i64>,
 }
 
 impl CPU {
@@ -82,36 +85,58 @@ impl CPU {
         let (_, mem) = parse_program(program).unwrap();
         CPU {
             pc: 0,
+            relative_base: 0,
             memory: mem,
             output: Vec::new(),
         }
     }
 
-    fn get_value(&self, mode: ParameterMode, idx: usize) -> i32 {
-        match mode {
-            ParameterMode::Position => {
-                let pos = self.memory[idx] as usize;
-                self.memory[pos]
+    fn get_value(&self, mode: ParameterMode, idx: usize) -> i64 {
+        let read_pos = match mode {
+            ParameterMode::Position => self.memory[idx] as usize,
+            ParameterMode::Relative => {
+                let rel = self.memory[idx] as i64;
+                (self.relative_base + rel) as usize
             }
-            ParameterMode::Immediate => self.memory[idx],
+            ParameterMode::Immediate => idx,
+        };
+
+        if read_pos < self.memory.len() {
+            self.memory[read_pos]
+        } else {
+            0
         }
     }
 
-    fn step(&mut self, input: &mut Vec<i32>) -> State {
-        let (op, m1, m2, _m3) = parse_op_code(self.memory[self.pc]);
+    fn set_value(&mut self, mode: ParameterMode, idx: usize, val: i64) {
+        let write_pos = match mode {
+            ParameterMode::Position => self.memory[idx] as usize,
+            ParameterMode::Relative => {
+                let rel = self.memory[idx] as i64;
+                (self.relative_base + rel) as usize
+            }
+            ParameterMode::Immediate => idx,
+        };
+
+        if write_pos > self.memory.len() {
+            self.memory.resize(write_pos * 2, 0);
+        }
+        self.memory[write_pos] = val;
+    }
+
+    fn step(&mut self, input: &mut Vec<i64>) -> State {
+        let (op, m1, m2, m3) = parse_op_code(self.memory[self.pc]);
         match op {
             Op::Add => {
                 let a = self.get_value(m1, self.pc + 1);
                 let b = self.get_value(m2, self.pc + 2);
-                let pd = self.memory[self.pc + 3] as usize;
-                self.memory[pd] = a + b;
+                self.set_value(m3, self.pc + 3, a + b);
                 self.pc += 4;
             }
             Op::Mul => {
                 let a = self.get_value(m1, self.pc + 1);
                 let b = self.get_value(m2, self.pc + 2);
-                let pd = self.memory[self.pc + 3] as usize;
-                self.memory[pd] = a * b;
+                self.set_value(m3, self.pc + 3, a * b);
                 self.pc += 4;
             }
             Op::Load => {
@@ -123,8 +148,7 @@ impl CPU {
                 if input.is_empty() {
                     return State::NeedInput;
                 } else {
-                    let pd = self.memory[self.pc + 1] as usize;
-                    self.memory[pd] = input.remove(0);
+                    self.set_value(m1, self.pc + 1, input.remove(0));
                     self.pc += 2;
                 }
             }
@@ -147,15 +171,17 @@ impl CPU {
             Op::LT => {
                 let a = self.get_value(m1, self.pc + 1);
                 let b = self.get_value(m2, self.pc + 2);
-                let pd = self.memory[self.pc + 3] as usize;
-                self.memory[pd] = if a < b { 1 } else { 0 };
+                self.set_value(m3, self.pc + 3, if a < b { 1 } else { 0 });
                 self.pc += 4;
+            }
+            Op::AdjRelBase => {
+                self.relative_base += self.get_value(m1, self.pc + 1);
+                self.pc += 2;
             }
             Op::Eq => {
                 let a = self.get_value(m1, self.pc + 1);
                 let b = self.get_value(m2, self.pc + 2);
-                let pd = self.memory[self.pc + 3] as usize;
-                self.memory[pd] = if a == b { 1 } else { 0 };
+                self.set_value(m3, self.pc + 3, if a == b { 1 } else { 0 });
                 self.pc += 4;
             }
             Op::End => return State::Exited,
@@ -163,7 +189,7 @@ impl CPU {
         State::Running
     }
 
-    pub fn run(&mut self, input: &mut Vec<i32>) -> State {
+    pub fn run(&mut self, input: &mut Vec<i64>) -> State {
         loop {
             let st = self.step(input);
             if st != State::Running {
@@ -284,5 +310,18 @@ mod tests {
         let mut cpu = CPU::new(input);
         cpu.run(&mut vec![88]);
         assert_eq!(1001, cpu.output[cpu.output.len() - 1]);
+
+        // Test relative store
+        let mut cpu = CPU::new("203,10,99");
+        cpu.run(&mut vec![88]);
+        assert_eq!(88, cpu.memory[10]);
+
+        let mut cpu = CPU::new("109,10,203,10,99");
+        cpu.run(&mut vec![88]);
+        assert_eq!(88, cpu.memory[20]);
+
+        let mut cpu = CPU::new("109,10,203,-10,99");
+        cpu.run(&mut vec![88]);
+        assert_eq!(88, cpu.memory[0]);
     }
 }

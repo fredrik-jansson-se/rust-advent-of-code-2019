@@ -6,7 +6,7 @@ pub fn run() {
     println!("2:2: {}", run_2(&input));
 }
 
-fn run_1(input: &str) -> i32 {
+fn run_1(input: &str) -> i64 {
     let mut cpu = super::intcode::CPU::new(input);
     cpu.memory[1] = 12;
     cpu.memory[2] = 2;
@@ -15,7 +15,7 @@ fn run_1(input: &str) -> i32 {
     cpu.memory[0]
 }
 
-fn run_2(input: &str) -> i32 {
+fn run_2(input: &str) -> i64 {
     for noun in 0..100 {
         for verb in 0..100 {
             let mut cpu = super::intcode::CPU::new(input);
