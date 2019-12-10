@@ -7,21 +7,24 @@ pub fn run() {
 }
 
 fn run_1(input: &str) -> i32 {
-    let (_, mut data) = super::intcode::parse_input(input).unwrap();
-    data[1] = 12;
-    data[2] = 2;
-    super::intcode::run_program(&mut data, 0, 0).0
+    let mut cpu = super::intcode::CPU::new(input);
+    cpu.memory[1] = 12;
+    cpu.memory[2] = 2;
+    cpu.run(&mut vec![0]);
+    // super::intcode::run_program(&mut data, 0, 0).0;
+    cpu.memory[0]
 }
 
 fn run_2(input: &str) -> i32 {
-    let (_, orig_data) = super::intcode::parse_input(input).unwrap();
     for noun in 0..100 {
         for verb in 0..100 {
-            let mut data = orig_data.clone();
+            let mut cpu = super::intcode::CPU::new(input);
+            // let mut data = orig_data.clone();
 
-            data[1] = noun;
-            data[2] = verb;
-            if 19690720 == super::intcode::run_program(&mut data, 0, 0).0 {
+            cpu.memory[1] = noun;
+            cpu.memory[2] = verb;
+            cpu.run(&mut vec![0]);
+            if 19690720 == cpu.memory[0] {
                 return 100 * noun + verb;
             }
         }

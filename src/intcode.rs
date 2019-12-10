@@ -3,7 +3,7 @@ use nom::bytes::complete::tag;
 use nom::multi::separated_nonempty_list;
 use nom::IResult;
 
-pub fn parse_input(i: &str) -> IResult<&str, Vec<i32>> {
+fn parse_program(i: &str) -> IResult<&str, Vec<i32>> {
     separated_nonempty_list(tag(","), i32_val)(i)
 }
 
@@ -64,80 +64,113 @@ fn parse_op_code(code: i32) -> (Op, ParameterMode, ParameterMode, ParameterMode)
     (op, m1, m2, m3)
 }
 
-fn get_value(data: &[i32], mode: ParameterMode, idx: usize) -> i32 {
-    match mode {
-        ParameterMode::Position => {
-            let pos = data[idx] as usize;
-            data[pos]
-        }
-        ParameterMode::Immediate => data[idx],
-    }
+#[derive(Debug, PartialEq)]
+pub enum State {
+    Running,
+    Exited,
+    NeedInput,
 }
 
-pub fn run_program(data: &mut [i32], input: i32, return_idx: usize) -> (i32, Vec<i32>) {
-    let mut pc = 0;
-    let mut output = Vec::new();
-    loop {
-        let (op, m1, m2, _m3) = parse_op_code(data[pc]);
+pub struct CPU {
+    pc: usize,
+    pub memory: Vec<i32>,
+    pub output: Vec<i32>,
+}
+
+impl CPU {
+    pub fn new(program: &str) -> Self {
+        let (_, mem) = parse_program(program).unwrap();
+        CPU {
+            pc: 0,
+            memory: mem,
+            output: Vec::new(),
+        }
+    }
+
+    fn get_value(&self, mode: ParameterMode, idx: usize) -> i32 {
+        match mode {
+            ParameterMode::Position => {
+                let pos = self.memory[idx] as usize;
+                self.memory[pos]
+            }
+            ParameterMode::Immediate => self.memory[idx],
+        }
+    }
+
+    fn step(&mut self, input: &mut Vec<i32>) -> State {
+        let (op, m1, m2, _m3) = parse_op_code(self.memory[self.pc]);
         match op {
             Op::Add => {
-                let a = get_value(data, m1, pc + 1);
-                let b = get_value(data, m2, pc + 2);
-                let pd = data[pc + 3] as usize;
-                data[pd] = a + b;
-                pc += 4;
+                let a = self.get_value(m1, self.pc + 1);
+                let b = self.get_value(m2, self.pc + 2);
+                let pd = self.memory[self.pc + 3] as usize;
+                self.memory[pd] = a + b;
+                self.pc += 4;
             }
             Op::Mul => {
-                let a = get_value(data, m1, pc + 1);
-                let b = get_value(data, m2, pc + 2);
-                let pd = data[pc + 3] as usize;
-                data[pd] = a * b;
-                pc += 4;
+                let a = self.get_value(m1, self.pc + 1);
+                let b = self.get_value(m2, self.pc + 2);
+                let pd = self.memory[self.pc + 3] as usize;
+                self.memory[pd] = a * b;
+                self.pc += 4;
             }
             Op::Load => {
-                let v = get_value(data, m1, pc + 1);
-                output.push(v);
-                pc += 2;
+                let v = self.get_value(m1, self.pc + 1);
+                self.output.push(v);
+                self.pc += 2;
             }
             Op::Store => {
-                let pd = data[pc + 1] as usize;
-                data[pd] = input;
-                pc += 2;
+                if input.is_empty() {
+                    return State::NeedInput;
+                } else {
+                    let pd = self.memory[self.pc + 1] as usize;
+                    self.memory[pd] = input.remove(0);
+                    self.pc += 2;
+                }
             }
             Op::JumpIfTrue => {
-                let v = get_value(data, m1, pc + 1);
+                let v = self.get_value(m1, self.pc + 1);
                 if v != 0 {
-                    pc = get_value(data, m2, pc + 2) as usize;
+                    self.pc = self.get_value(m2, self.pc + 2) as usize;
                 } else {
-                    pc += 3;
+                    self.pc += 3;
                 }
             }
             Op::JumpIfFalse => {
-                let v = get_value(data, m1, pc + 1);
+                let v = self.get_value(m1, self.pc + 1);
                 if v == 0 {
-                    pc = get_value(data, m2, pc + 2) as usize;
+                    self.pc = self.get_value(m2, self.pc + 2) as usize;
                 } else {
-                    pc += 3;
+                    self.pc += 3;
                 }
             }
             Op::LT => {
-                let a = get_value(data, m1, pc + 1);
-                let b = get_value(data, m2, pc + 2);
-                let pd = data[pc + 3] as usize;
-                data[pd] = if a < b { 1 } else { 0 };
-                pc += 4;
+                let a = self.get_value(m1, self.pc + 1);
+                let b = self.get_value(m2, self.pc + 2);
+                let pd = self.memory[self.pc + 3] as usize;
+                self.memory[pd] = if a < b { 1 } else { 0 };
+                self.pc += 4;
             }
             Op::Eq => {
-                let a = get_value(data, m1, pc + 1);
-                let b = get_value(data, m2, pc + 2);
-                let pd = data[pc + 3] as usize;
-                data[pd] = if a == b { 1 } else { 0 };
-                pc += 4;
+                let a = self.get_value(m1, self.pc + 1);
+                let b = self.get_value(m2, self.pc + 2);
+                let pd = self.memory[self.pc + 3] as usize;
+                self.memory[pd] = if a == b { 1 } else { 0 };
+                self.pc += 4;
             }
-            Op::End => break,
+            Op::End => return State::Exited,
+        }
+        State::Running
+    }
+
+    pub fn run(&mut self, input: &mut Vec<i32>) -> State {
+        loop {
+            let st = self.step(input);
+            if st != State::Running {
+                return st;
+            }
         }
     }
-    (data[return_idx], output)
 }
 
 #[cfg(test)]
@@ -147,11 +180,11 @@ mod tests {
     fn intcode_parse() {
         use super::*;
         let input = "1,0,0,0,99";
-        let (_, input) = parse_input(input).unwrap();
+        let (_, input) = parse_program(input).unwrap();
         assert_eq!(5, input.len());
 
-        assert_eq!(parse_input("-1,2,4,-6"), Ok(("", vec![-1, 2, 4, -6])));
-        assert_eq!(parse_input("-1,2,4,-6\n"), Ok(("\n", vec![-1, 2, 4, -6])));
+        assert_eq!(parse_program("-1,2,4,-6"), Ok(("", vec![-1, 2, 4, -6])));
+        assert_eq!(parse_program("-1,2,4,-6\n"), Ok(("\n", vec![-1, 2, 4, -6])));
     }
 
     #[test]
@@ -172,79 +205,84 @@ mod tests {
     fn intcode_run_program() {
         use super::*;
         let input = "1,0,0,0,99";
-        let (_, mut input) = parse_input(input).unwrap();
-        assert_eq!(2, run_program(&mut input, 0, 0).0);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(2, cpu.memory[0]);
 
         let input = "2,3,0,3,99";
-        let (_, mut input) = parse_input(input).unwrap();
-        assert_eq!(6, run_program(&mut input, 0, 3).0);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(6, cpu.memory[3]);
 
         let input = "2,4,4,5,99,0";
-        let (_, mut input) = parse_input(input).unwrap();
-        assert_eq!(9801, run_program(&mut input, 0, 5).0);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(9801, cpu.memory[5]);
 
         let input = "1,1,1,4,99,5,6,0,99";
-        let (_, mut input) = parse_input(input).unwrap();
-        assert_eq!(30, run_program(&mut input, 0, 0).0);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(30, cpu.memory[0]);
 
         let input = "1002,4,3,4,33";
-        let (_, mut input) = parse_input(input).unwrap();
-        assert_eq!(99, run_program(&mut input, 0, 4).0);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(99, cpu.memory[4]);
 
-        // Using position mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
+        // // Using position mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
         let input = "3,9,8,9,10,9,4,9,99,-1,8";
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 0, 0);
-        assert_eq!(0, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(0, cpu.output[cpu.output.len() - 1]);
 
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 8, 0);
-        assert_eq!(1, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![8]);
+        assert_eq!(1, cpu.output[cpu.output.len() - 1]);
 
-        // Using position mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
+        // // Using position mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
         let input = "3,9,7,9,10,9,4,9,99,-1,8";
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 0, 0);
-        assert_eq!(1, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(1, cpu.output[cpu.output.len() - 1]);
 
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 8, 0);
-        assert_eq!(0, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![8]);
+        assert_eq!(0, cpu.output[cpu.output.len() - 1]);
 
-        // Using immediate mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
+        // // Using immediate mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
         let input = "3,3,1108,-1,8,3,4,3,99";
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 0, 0);
-        assert_eq!(0, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(0, cpu.output[cpu.output.len() - 1]);
 
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 8, 0);
-        assert_eq!(1, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![8]);
+        assert_eq!(1, cpu.output[cpu.output.len() - 1]);
 
-        // Using immediate mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
+        // // Using immediate mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
         let input = "3,3,1107,-1,8,3,4,3,99";
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 0, 0);
-        assert_eq!(1, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(1, cpu.output[cpu.output.len() - 1]);
 
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 8, 0);
-        assert_eq!(0, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![8]);
+        assert_eq!(0, cpu.output[cpu.output.len() - 1]);
 
-        //  The program will then output 999 if the input value is below 8,
+        // //  The program will then output 999 if the input value is below 8,
         let input = "3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99";
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 0, 0);
-        assert_eq!(999, output[output.len() - 1]);
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![0]);
+        assert_eq!(999, cpu.output[cpu.output.len() - 1]);
 
-        //  output 1000 if the input value is equal to 8,
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 8, 0);
-        assert_eq!(1000, output[output.len() - 1]);
+        // //  output 1000 if the input value is equal to 8,
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![8]);
+        assert_eq!(1000, cpu.output[cpu.output.len() - 1]);
 
-        //  or output 1001 if the input value is greater than 8.
-        let (_, mut code) = parse_input(input).unwrap();
-        let (_, output) = run_program(&mut code, 88, 0);
-        assert_eq!(1001, output[output.len() - 1]);
+        // //  or output 1001 if the input value is greater than 8.
+        let mut cpu = CPU::new(input);
+        cpu.run(&mut vec![88]);
+        assert_eq!(1001, cpu.output[cpu.output.len() - 1]);
     }
 }

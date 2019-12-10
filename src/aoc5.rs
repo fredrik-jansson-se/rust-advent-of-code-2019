@@ -8,15 +8,15 @@ pub fn run() {
 }
 
 fn run_1(input: &str) -> i32 {
-    let (_, mut data) = super::intcode::parse_input(input).unwrap();
-    let (_, output) = super::intcode::run_program(&mut data, 1, 0);
-    output[output.len() - 1]
+    let mut cpu = super::intcode::CPU::new(input);
+    cpu.run(&mut vec![1]);
+    cpu.output[cpu.output.len() - 1]
 }
 
 fn run_2(input: &str) -> i32 {
-    let (_, mut data) = super::intcode::parse_input(input).unwrap();
-    let (_, output) = super::intcode::run_program(&mut data, 5, 0);
-    output[output.len() - 1]
+    let mut cpu = super::intcode::CPU::new(input);
+    cpu.run(&mut vec![5]);
+    cpu.output[cpu.output.len() - 1]
 }
 
 #[cfg(test)]
