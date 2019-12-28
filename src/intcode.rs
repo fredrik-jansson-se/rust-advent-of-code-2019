@@ -73,6 +73,7 @@ pub enum State {
     NeedInput,
 }
 
+#[derive(Clone)]
 pub struct CPU {
     pc: usize,
     relative_base: i64,
