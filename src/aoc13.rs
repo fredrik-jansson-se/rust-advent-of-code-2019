@@ -51,7 +51,6 @@ fn run_2(input: &str) -> i64 {
 
     let mut window = Window::new("Aoc13-2", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
 
-    // Joystick neutral
     let mut ball_position = 10;
     let mut paddle_position = 0;
     while window.is_open() {
@@ -64,9 +63,9 @@ fn run_2(input: &str) -> i64 {
             match c[2] {
                 s if x == -1 && y == 0 => {
                     score = s;
-                    println!("Score: {}", c[2]);
+                    // println!("Score: {}", c[2]);
                 }
-                0 => draw(&mut video, x, y, 0x0000000),
+                0 => draw(&mut video, x, y, 0x01010101),
                 1 => draw(&mut video, x, y, 0xff000000),
                 2 => draw(&mut video, x, y, 0x00ff0000),
                 3 => {
