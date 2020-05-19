@@ -1,5 +1,5 @@
 use crate::intcode::{State, CPU};
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Window, WindowOptions};
 use std::fs;
 
 pub fn run() {
@@ -94,9 +94,7 @@ fn run_2(input: &str) -> i64 {
             input.push(0);
         }
 
-        window
-            .update_with_buffer_size(&video, WIDTH, HEIGHT)
-            .unwrap();
+        window.update_with_buffer(&video, WIDTH, HEIGHT).unwrap();
         cpu.output.clear();
     }
 

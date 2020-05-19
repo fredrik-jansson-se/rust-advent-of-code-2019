@@ -3,7 +3,8 @@ use std::fs;
 
 pub fn run() {
     let input = fs::read_to_string("day10.txt").unwrap();
-    println!("10:1 {:?}", run_1(&input));
+    let (_, m) = run_1(&input);
+    println!("10:1 {:?}", m);
 }
 
 fn gcd(a: i32, b: i32) -> i32 {
@@ -16,41 +17,75 @@ fn gcd(a: i32, b: i32) -> i32 {
     }
 }
 
-fn run_1(input: &str) -> (usize, usize) {
+// Calculate line equation on the form
+// a*y = b*x + m
+// This allows us to handle vertical lines where a=0
+fn line_eq((x1, y1): (i32, i32), (x2, y2): (i32, i32)) -> (i32, i32, i32) {
+    let a = x2 - x1;
+    let b = y2 - y1;
+    let g = gcd(a.abs(), b.abs());
+    let a = a / g;
+    let b = b / g;
+    let m = a * y1 - b * x1;
+    (a, b, m)
+}
+
+fn run_1(input: &str) -> ((usize, usize), usize) {
     let map = parse(input);
-    let mut lines = HashSet::new();
-    let mut asteroids = HashSet::new();
+
+    let mut visible = HashMap::new();
 
     for (source_y, source_row) in map.iter().enumerate() {
         for (source_x, s) in source_row.iter().enumerate() {
             if !s {
                 continue;
             }
-            asteroids.insert((source_x, source_y));
+
+            let mut lines_checked = HashSet::new();
+
+            // Look at all asteroids that are at higher x and y.
             for (dest_y, dest_row) in map.iter().enumerate().skip(source_y) {
-                // if we are on the same line, just look forward in the x-dir
-                let x_skip = if dest_y == source_y { source_x + 1 } else { 0 };
-                for (dest_x, d) in dest_row.iter().enumerate().skip(x_skip) {
+                // If on the same row (y) only consider asteroids to the right,
+                // otherwise all asteroids on the next rows
+                let to_skip = if dest_y == source_y { source_x + 1 } else { 0 };
+                for (dest_x, d) in dest_row.iter().enumerate().skip(to_skip) {
                     if !d {
                         continue;
                     }
-                    asteroids.insert((dest_x, dest_y));
-                    lines.insert((source_x, source_y, dest_x, dest_y));
-                    // dbg! {(source_x, source_y, dest_x, dest_y)};
+                    let l_eq = line_eq(
+                        (source_x as i32, source_y as i32),
+                        (dest_x as i32, dest_y as i32),
+                    );
+
+                    // If we have previously followed this trajectory, we know there's an asteroid
+                    // between blocking view of this
+                    if lines_checked.contains(&l_eq) {
+                        continue;
+                    }
+
+                    lines_checked.insert(l_eq);
+
+                    // Update count for source
+                    let asteroid_cnt = visible.entry((source_x, source_y)).or_insert(0);
+                    *asteroid_cnt += 1;
+
+                    // Update count for dest
+                    let asteroid_cnt = visible.entry((dest_x, dest_y)).or_insert(0);
+                    *asteroid_cnt += 1;
+                    // println!(
+                    //     "({}, {}) -> ({}, {}), {:?}",
+                    //     source_x, source_y, dest_x, dest_y, l_eq
+                    // );
                 }
             }
         }
     }
-    for (x1, y1, x2, y2) in lines {
-        let mut dy = y2 as i32 - y1 as i32;
-        let mut dx = x2 as i32 - x1 as i32;
-        let g = gcd(dy.abs(), dx.abs());
-        dy /= g;
-        dx /= g;
 
-        dbg! {(dx, dy)};
-    }
-    (0, 0)
+    let (max_ast, m) = visible
+        .iter()
+        .max_by(|(_, cnt1), (_, cnt2)| cnt1.cmp(cnt2))
+        .unwrap();
+    (*max_ast, *m)
 }
 
 fn parse(i: &str) -> Vec<Vec<bool>> {
@@ -84,6 +119,16 @@ mod tests {
     #[test]
     fn aoc10_run_1() {
         use super::*;
+
+        assert_eq!(
+            run_1(
+                r#"#..
+.#.
+..#"#
+            ),
+            ((1, 1), 8)
+        );
+
         assert_eq!(
             run_1(
                 r#".#..#
@@ -92,7 +137,81 @@ mod tests {
 ....#
 ...##"#
             ),
-            (3, 4)
+            ((3, 4), 33)
+        );
+
+        assert_eq!(
+            run_1(
+                r#"......#.#.
+#..#.#....
+..#######.
+.#.#.###..
+.#..#.....
+..#....#.#
+#..#....#.
+.##.#..###
+##...#..#.
+.#....####"#
+            ),
+            ((5, 8), 33)
+        );
+
+        assert_eq!(
+            run_1(
+                r#"#.#...#.#.
+.###....#.
+.#....#...
+##.#.#.#.#
+....#.#.#.
+.##..###.#
+..#...##..
+..##....##
+......#...
+.####.###."#
+            ),
+            ((1, 2), 35)
+        );
+
+        assert_eq!(
+            run_1(
+                r#".#..#..###
+####.###.#
+....###.#.
+..###.##.#
+##.##.#.#.
+....###..#
+..#.#..#.#
+#..#.#.###
+.##...##.#
+.....#.#.."#
+            ),
+            ((6, 3), 41)
+        );
+
+        assert_eq!(
+            run_1(
+                r#".#..##.###...#######
+##.############..##.
+.#.######.########.#
+.###.#######.####.#.
+#####.##.#.##.###.##
+..#####..#.#########
+####################
+#.####....###.#.#.##
+##.#################
+#####.##.###..####..
+..######..##.#######
+####.##.####...##..#
+.#####..#.######.###
+##...#.##########...
+#.##########.#######
+.####.#.###.###.#.##
+....##.##.###..#####
+.#.#.###########.###
+#.#.#.#####.####.###
+###.##.####.##.#..##"#
+            ),
+            ((11, 13), 210)
         );
     }
 }

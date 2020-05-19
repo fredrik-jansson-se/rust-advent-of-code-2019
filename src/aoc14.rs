@@ -1,12 +1,16 @@
 use nom::{
     bytes::complete::tag,
     character::complete::{alpha1, newline, space1},
-    combinator::map,
     multi::separated_nonempty_list,
     sequence::separated_pair,
     IResult,
 };
+
+use std::collections::HashMap;
 use std::fs;
+
+const FUEL: &str = "FUEL";
+const ORE: &str = "ORE";
 
 pub fn run() {
     let input = fs::read_to_string("day14.txt").unwrap();
@@ -38,12 +42,29 @@ fn ingredients_to(target: &str, reactions: &[Reaction], current: &Quantity) -> u
 fn run_1(input: &str) -> u32 {
     let (_, reactions) = parse(input).unwrap();
 
-    let fuel_reaction: &Reaction = reactions
-        .iter()
-        .find(|(_, (_, name))| *name == "FUEL")
-        .unwrap();
+    let mut needed_to_produce = produce(1, FUEL, &reactions);
+    let mut num_ore = 0;
 
-    ingredients_to("ORE", &reactions, &fuel_reaction.1)
+    while !needed_to_produce.is_empty() {
+        dbg! {&needed_to_produce};
+        let mut new_to_produce = Vec::new();
+
+        for (n, q) in needed_to_produce {
+            println!("{}: {}", n, q);
+            if n == ORE {
+                num_ore += q;
+                continue;
+            }
+
+            new_to_produce.append(&mut produce(q, &n, &reactions));
+        }
+
+        needed_to_produce = new_to_produce;
+    }
+
+    println!("num_ore: {}", num_ore);
+
+    num_ore
 }
 
 type Quantity<'a> = (u32, &'a str);
@@ -54,6 +75,12 @@ fn parse_chemical(i: &str) -> IResult<&str, Quantity> {
 
 type Reaction<'a> = (Vec<Quantity<'a>>, Quantity<'a>);
 
+#[derive(Debug, Clone)]
+struct Output {
+    input_quantity: u32,
+    output: Vec<(String, u32)>,
+}
+
 fn parse_reaction(i: &str) -> IResult<&str, Reaction> {
     let (i, input) = separated_nonempty_list(tag(", "), parse_chemical)(i)?;
     let (i, _) = tag(" => ")(i)?;
@@ -61,8 +88,38 @@ fn parse_reaction(i: &str) -> IResult<&str, Reaction> {
     Ok((i, (input, output)))
 }
 
-fn parse(i: &str) -> IResult<&str, Vec<Reaction>> {
-    separated_nonempty_list(newline, parse_reaction)(i)
+type Reactions = HashMap<String, Output>;
+
+fn parse(i: &str) -> IResult<&str, Reactions> {
+    let (i, reactions) = separated_nonempty_list(newline, parse_reaction)(i)?;
+
+    let mut h = HashMap::new();
+
+    for (outputs, input) in reactions {
+        let (input_quantity, input_name) = input;
+
+        h.insert(
+            input_name.to_owned(),
+            Output {
+                input_quantity,
+                output: outputs.iter().map(|(q, n)| (n.to_string(), *q)).collect(),
+            },
+        );
+    }
+
+    Ok((i, h))
+}
+
+fn produce(q: u32, name: &str, r: &Reactions) -> Vec<(String, u32)> {
+    let output = r.get(name).unwrap();
+
+    let multiplier = (q as f32 / output.input_quantity as f32).ceil() as u32;
+
+    output
+        .output
+        .iter()
+        .map(|(name, q_o)| (name.clone(), multiplier * q_o))
+        .collect()
 }
 
 #[cfg(test)]
@@ -172,6 +229,29 @@ mod tests {
             ),
             2210736
         );
+    }
+
+    #[test]
+    fn aoc14_produce() {
+        let input = r#"9 ORE => 2 A
+8 ORE => 3 B
+7 ORE => 5 C
+3 A, 4 B => 1 AB
+5 B, 7 C => 1 BC
+4 C, 1 A => 1 CA
+2 AB, 3 BC, 4 CA => 1 FUEL"#;
+
+        let (_, reactions) = super::parse(&input).unwrap();
+
+        let fuel_1 = super::produce(1, "FUEL", &reactions);
+        assert!(fuel_1.iter().any(|(n, q)| n == "AB" && *q == 2));
+        assert!(fuel_1.iter().any(|(n, q)| n == "BC" && *q == 3));
+        assert!(fuel_1.iter().any(|(n, q)| n == "CA" && *q == 4));
+
+        let bc_3 = super::produce(3, "BC", &reactions);
+
+        assert!(bc_3.iter().any(|(n, q)| n == "B" && *q == 15));
+        assert!(bc_3.iter().any(|(n, q)| n == "C" && *q == 2));
     }
 
     #[test]

@@ -6,7 +6,7 @@ use nom::{
     multi::separated_nonempty_list, IResult,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Vec3 {
     x: i32,
     y: i32,
@@ -24,6 +24,7 @@ fn parse_vec3(i: &str) -> IResult<&str, Vec3> {
     Ok((i, Vec3 { x, y, z }))
 }
 
+#[derive(Clone, PartialEq)]
 struct Moon {
     pos: Vec3,
     vel: Vec3,
@@ -81,6 +82,7 @@ fn parse(i: &str) -> IResult<&str, Vec<Moon>> {
 pub fn run() {
     let input = fs::read_to_string("day12.txt").unwrap();
     println!("12:1 {}", run_1(&input, 1000));
+    println!("12:2 {}", run_2(&input));
 }
 
 fn run_1(input: &str, steps: usize) -> i32 {
@@ -99,6 +101,34 @@ fn run_1(input: &str, steps: usize) -> i32 {
         .iter()
         .map(|m| m.kinetic_energe() * m.potential_energy())
         .sum()
+}
+
+fn run_2(input: &str) -> u64 {
+    let (_, mut moons) = parse(input).unwrap();
+    let moons_orig = moons.clone();
+
+    // Count the number of steps until moon is back at original spot
+    let mut moon_steps = vec![0; moons.len()];
+
+    // Stop counting when moon is back
+    let mut moon_done = vec![false; moons.len()];
+    while !moon_done.iter().all(|&t| t) {
+        for a in 0..moons.len() {
+            let (left, right) = moons.split_at_mut(a + 1);
+            for mb in right {
+                left[a].gravity(mb);
+            }
+            left[a].step_velocity();
+            if !moon_done[a] {
+                moon_steps[a] += 1;
+                if left[a] == moons_orig[a] {
+                    println!("{} done", a);
+                    moon_done[a] = true;
+                }
+            }
+        }
+    }
+    0
 }
 
 #[cfg(test)]
@@ -129,5 +159,21 @@ mod tests {
 <x=2, y=-7, z=3>
 <x=9, y=-8, z=-3>"#;
         assert_eq!(run_1(input, 100), 1940);
+    }
+
+    #[test]
+    fn aoc12_run_2() {
+        use super::*;
+        let input = r#"<x=-1, y=0, z=2>
+<x=2, y=-10, z=-7>
+<x=4, y=-8, z=8>
+<x=3, y=5, z=-1>"#;
+        assert_eq!(run_2(input), 2772);
+
+        let input = r#"<x=-8, y=-10, z=0>
+<x=5, y=5, z=10>
+<x=2, y=-7, z=3>
+<x=9, y=-8, z=-3>"#;
+        assert_eq!(run_2(input), 4686774924);
     }
 }

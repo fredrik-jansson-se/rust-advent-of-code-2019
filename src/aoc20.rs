@@ -16,7 +16,7 @@ enum Type {
 fn parse(input: &str) -> Vec<Vec<Type>> {
     let mut map = Vec::new();
     let lns = input.lines();
-    for (row_no, row) in lns.enumerate() {
+    for (_row_no, row) in lns.enumerate() {
         let mut map_row = Vec::new();
         for p in row.chars() {
             match p {
@@ -33,11 +33,11 @@ fn parse(input: &str) -> Vec<Vec<Type>> {
 }
 
 fn run_1(input: &str) -> i64 {
-    let map = parse(input);
+    let _map = parse(input);
     0
 }
 
-fn run_2(input: &str) -> i64 {
+fn run_2(_input: &str) -> i64 {
     unreachable!();
 }
 

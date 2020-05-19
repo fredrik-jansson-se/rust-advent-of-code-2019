@@ -229,10 +229,9 @@ fn run_1(input: &str) -> usize {
 }
 
 mod tests {
-    use super::*;
-
     #[test]
     fn aoc24_parse_group() {
+        use super::*;
         assert_eq!(
             Ok(("", AttackType::Bludgenoning)),
             AttackType::parse("bludgeoning")
@@ -334,7 +333,7 @@ Infection:
 Infection:
 801 units each with 4706 hit points (weak to radiation) with an attack that does 116 bludgeoning damage at initiative 1
 4485 units each with 2961 hit points (immune to radiation; weak to fire, cold) with an attack that does 12 slashing damage at initiative 4";
-        assert_eq!(5216, run_1(armies));
+        assert_eq!(5216, super::run_1(armies));
     }
 
     #[test]

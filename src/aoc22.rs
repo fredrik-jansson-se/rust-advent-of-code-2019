@@ -177,7 +177,7 @@ impl State {
     }
 
     fn distance_to_target(n: &Node, target: &Coord) -> usize {
-        (absdiff(n.pos.0, target.0) + absdiff(n.pos.1, target.1))
+        absdiff(n.pos.0, target.0) + absdiff(n.pos.1, target.1)
     }
 
     fn solve(&mut self) -> Option<(Vec<Node>, usize)> {
