@@ -119,7 +119,7 @@ impl CPU {
             ParameterMode::Immediate => idx,
         };
 
-        if write_pos > self.memory.len() {
+        if write_pos >= self.memory.len() {
             self.memory.resize(write_pos * 2, 0);
         }
         self.memory[write_pos] = val;

@@ -2,7 +2,7 @@ use std::fs;
 
 pub fn run() {
     let input = fs::read_to_string("day21.txt").unwrap();
-    println!("17:1 {:?}", run_1(&input));
+    println!("21:1 {:?}", run_1(&input));
 }
 
 fn run_1(program: &str) -> i64 {
@@ -15,5 +15,5 @@ fn run_1(program: &str) -> i64 {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn aoc17_parse() {}
+    fn aoc21_parse() {}
 }

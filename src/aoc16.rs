@@ -1,4 +1,4 @@
-use rayon::prelude::*;
+// use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs;
 
@@ -45,6 +45,16 @@ fn pattern(pos: usize, input_len: usize, lookup: &mut HashMap<usize, Vec<isize>>
     lookup.entry(pos).or_insert(pattern_for_pos(pos, input_len))
 }
 
+fn get_index(data: &[isize]) -> usize {
+    let mut idx = 0;
+
+    for i in data.iter().take(7) {
+        idx = (idx * 10) + *i as usize;
+    }
+
+    idx
+}
+
 fn run_1(input: &str, iterations: usize, digits: usize) -> Vec<isize> {
     let (_, mut input) = parse(input).unwrap();
 
@@ -68,11 +78,26 @@ fn run_1(input: &str, iterations: usize, digits: usize) -> Vec<isize> {
     input
 }
 
-fn run_2(input: &str, iterations: usize, digits: usize) -> Vec<isize> {
+fn run_2(input: &str, _iterations: usize, digits: usize) -> Vec<isize> {
     let (_, mut input) = parse(input).unwrap();
 
-    let input_len = input.len() * 10000;
+    let message_offset = get_index(&input);
 
+    {
+        let orig = input.clone();
+        for _ in 0..10000 {
+            input.extend(&orig);
+        }
+    }
+
+    // let mut lookup = Vec::with_capacity(input.len());
+    // (0..input.len())
+    //     .into_par_iter()
+    //     .map(|i| pattern_for_pos(i + 1, input.len()))
+    //     .collect_into_vec(&mut lookup);
+    // for i in 0..input.len() {
+    //     lookup.push(pattern_for_pos(i + 1, lookup.len()));
+    // }
     // let lookup: Vec<Vec<isize>> = input
     //     .iter()
     //     .cycle()
@@ -80,7 +105,12 @@ fn run_2(input: &str, iterations: usize, digits: usize) -> Vec<isize> {
     //     .par_map(|(pos, _)| pattern_for_pos(pos, input_len))
     //     .collect();
 
-    Vec::new()
+    input
+        .iter()
+        .skip(message_offset)
+        .take(digits)
+        .map(|i| *i)
+        .collect()
 }
 
 #[cfg(test)]
@@ -135,6 +165,19 @@ mod tests {
             run_1("69317163492948606335995924319873", 100, 8),
             parse("52432133").unwrap().1
         );
+    }
+
+    #[test]
+    fn aoc16_run_get_index() {
+        use super::*;
+        let (_, input) = parse("03036732577212944063491565474664").unwrap();
+        assert_eq!(get_index(&input), 0303673);
+
+        let (_, input) = parse("02935109699940807407585447034323").unwrap();
+        assert_eq!(get_index(&input), 0293510);
+
+        let (_, input) = parse("03081770884921959731165446850517").unwrap();
+        assert_eq!(get_index(&input), 0308177);
     }
 
     #[test]
