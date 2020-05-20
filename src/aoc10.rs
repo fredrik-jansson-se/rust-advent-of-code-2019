@@ -3,8 +3,9 @@ use std::fs;
 
 pub fn run() {
     let input = fs::read_to_string("day10.txt").unwrap();
-    let (_, m) = run_1(&input);
-    println!("10:1 {:?}", m);
+    let (c, m) = run_1(&input);
+    println!("10:1 {}", m);
+    println!("10:2 {}", run_2(&input, c));
 }
 
 fn gcd(a: i32, b: i32) -> i32 {
@@ -99,7 +100,54 @@ fn parse(i: &str) -> Vec<Vec<bool>> {
 }
 
 fn run_2(input: &str, (x, y): (usize, usize)) -> usize {
-    0
+    let map = parse(input);
+
+    let mut asteroids = Vec::new();
+    for (source_y, source_row) in map.iter().enumerate() {
+        for (source_x, s) in source_row.iter().enumerate() {
+            if !s || (source_x, source_y) == (x, y) {
+                continue;
+            }
+
+            let dx = source_x as f32 - x as f32;
+            let dy = source_y as f32 - y as f32;
+
+            let angle = dy.atan2(dx);
+            let dist = (dx * dx + dy * dy) as usize;
+
+            asteroids.push((angle, dist, (source_x, source_y)));
+        }
+    }
+
+    asteroids.sort_by(
+        |(a1, d1, _), (a2, d2, _)| match a1.partial_cmp(&a2).unwrap() {
+            std::cmp::Ordering::Equal => d1.cmp(d2),
+            c => c,
+        },
+    );
+
+    let mut cur_angle = -std::f32::consts::PI / 2.0 - std::f32::EPSILON;
+    for i in 0..200 {
+        let (next_a, _, pos) = asteroids
+            .iter()
+            .find(|(a, _, _)| *a > cur_angle)
+            .unwrap()
+            .clone();
+
+        if i == 199 {
+            return pos.0 * 100 + pos.1;
+        }
+
+        asteroids.retain(|(_, _, p)| p != &pos);
+
+        cur_angle = next_a;
+
+        if asteroids.iter().find(|(a, _, _)| *a > cur_angle).is_none() {
+            cur_angle -= 2.0 * std::f32::consts::PI;
+        }
+    }
+
+    panic!("Shouldn't end up here :)");
 }
 
 #[cfg(test)]
@@ -225,11 +273,26 @@ mod tests {
 
         assert_eq!(
             run_2(
-                r#".#....#####...#..
-##...##.#####..##
-##...#...#.#####.
-..#.....X...###..
-..#.#.....#....##"#,
+                r#".#..##.###...#######
+##.############..##.
+.#.######.########.#
+.###.#######.####.#.
+#####.##.#.##.###.##
+..#####..#.#########
+####################
+#.####....###.#.#.##
+##.#################
+#####.##.###..####..
+..######..##.#######
+####.##.####...##..#
+.#####..#.######.###
+##...#.##########...
+#.##########.#######
+.####.#.###.###.#.##
+....##.##.###..#####
+.#.#.###########.###
+#.#.#.#####.####.###
+###.##.####.##.#..##"#,
                 (11, 13)
             ),
             802
