@@ -1,247 +1,192 @@
-use pathfinding::prelude::{absdiff, astar};
-
-type Coord = (usize, usize);
-
-pub fn run() {
-    println!("22:1 {}", run_1(11991, (6, 797)));
-    println!("22:2 {}", run_2(11991, (6, 797)));
-    // 1051
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum Tool {
-    Torch,
-    ClimbingGear,
-    Neither,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-enum Type {
-    //    Unknown,
-    Rocky,
-    Wet,
-    Narrow,
-}
-
-impl Type {
-    fn from_erosion_level(erosion_level: u64) -> Self {
-        match erosion_level % 3 {
-            0 => Type::Rocky,
-            1 => Type::Wet,
-            _ => Type::Narrow,
-        }
-    }
-
-    fn available_tools(&self) -> &'static [Tool] {
-        match self {
-            Type::Rocky => &[Tool::Torch, Tool::ClimbingGear],
-            Type::Wet => &[Tool::ClimbingGear, Tool::Neither],
-            Type::Narrow => &[Tool::Torch, Tool::Neither],
-        }
-    }
-}
-
-type Map = Vec<Vec<u64>>;
-
-fn create_map(width: usize, height: usize) -> Map {
-    let mut res = Vec::with_capacity(height);
-
-    for _ in 0..height {
-        res.push(vec![0; width]);
-    }
-
-    res
-}
-
-fn geologic_index(x: usize, y: usize, target: &Coord, map: &Map) -> u64 {
-    if x == 0 && y == 0 {
-        0
-    } else if x == target.0 && y == target.1 {
-        0
-    } else if x == 0 {
-        y as u64 * 48271
-    } else if y == 0 {
-        x as u64 * 16807
-    } else {
-        map[y - 1][x] * map[y][x - 1]
-    }
-}
-
-fn erosion_level(x: usize, y: usize, target: &Coord, map: &Map, depth: usize) -> u64 {
-    (geologic_index(x, y, target, map) + depth as u64) % 20183
-}
-
-fn expand_map(map: &mut Map, target: &Coord, depth: usize) {
-    let old_height = map.len();
-    let new_height = 4 * old_height;
-    let old_width = map[0].len();
-    let new_width = 4 * old_width;
-    *map = create_map(new_width, new_height);
-    for y in 0..new_height {
-        for x in 0..new_width {
-            let gl = erosion_level(x, y, &target, &map, depth);
-            map[y][x] = gl;
-        }
-    }
-}
-
-fn run_1(depth: usize, target: Coord) -> u64 {
-    let width = target.0 + 1;
-    let height = target.1 + 1;
-    let mut map = create_map(width, height);
-
-    let mut sum = 0;
-    for y in 0..height {
-        for x in 0..width {
-            let gl = erosion_level(x, y, &target, &map, depth);
-            map[y][x] = gl;
-            sum += gl % 3;
-        }
-    }
-
-    sum
-}
+use nom::{
+    branch::alt, bytes::complete::tag, character::complete::newline,
+    multi::separated_nonempty_list, IResult,
+};
+use std::fs;
 
 #[derive(Debug)]
-struct State {
-    target: Coord,
-    depth: usize,
-    tool: Tool,
-    map: Map,
+enum Tech {
+    Deal,
+    DealWithIncrement(usize),
+    Cut(isize),
 }
 
-impl State {
-    fn new(depth: usize, target: Coord) -> Self {
-        let width = 1 * target.0 + 1;
-        let height = 1 * target.1 + 1;
-        let mut map = create_map(width, height);
-
-        for y in 0..height {
-            for x in 0..width {
-                let gl = erosion_level(x, y, &target, &map, depth);
-                map[y][x] = gl;
-            }
-        }
-        State {
-            target,
-            depth,
-            tool: Tool::Torch,
-            map,
-        }
-    }
-    fn next_region(&mut self, node: &Node) -> Vec<(Node, usize)> {
-        let x = node.pos.0;
-        let y = node.pos.1;
-        let mut regions = vec![(x + 1, y), (x, y + 1)];
-        if x > 0 {
-            regions.push((x - 1, y));
-        }
-        if y > 0 {
-            regions.push((x, y - 1));
-        }
-
-        let mut res = Vec::new();
-
-        let cur_widht = self.map[0].len();
-        let cur_height = self.map.len();
-        if (x + 1) >= cur_widht || (y + 1) > cur_height {
-            println!("Expanding map");
-            expand_map(&mut self.map, &self.target, self.depth);
-        }
-
-        let my_type = Type::from_erosion_level(self.map[node.pos.1][node.pos.0]);
-        let my_possible_tools = my_type.available_tools();
-        for (x, y) in regions {
-            let reg_type = Type::from_erosion_level(self.map[y][x]);
-            let reg_possible_tools = reg_type.available_tools();
-
-            for my_tool in my_possible_tools {
-                if reg_possible_tools.contains(my_tool) {
-                    let cost = if *my_tool == node.tool { 1 } else { 7 + 1 };
-                    // Have to enter the target holding a torch
-                    if (x, y) == self.target && *my_tool != Tool::Torch {
-                        continue;
-                    }
-                    res.push((
-                        Node {
-                            pos: (x, y),
-                            tool: my_tool.clone(),
-                        },
-                        cost,
-                    ));
-                }
-            }
-        }
-
-        res
+impl Tech {
+    fn parse(i: &str) -> IResult<&str, Self> {
+        alt((Self::deal, Self::deal_with_increment, Self::cut))(i)
     }
 
-    fn distance_to_target(n: &Node, target: &Coord) -> usize {
-        absdiff(n.pos.0, target.0) + absdiff(n.pos.1, target.1)
+    fn deal(i: &str) -> IResult<&str, Self> {
+        let (i, _) = tag("deal into new stack")(i)?;
+        Ok((i, Self::Deal))
     }
 
-    fn solve(&mut self) -> Option<(Vec<Node>, usize)> {
-        let start = Node {
-            pos: (0, 0),
-            tool: Tool::Torch,
+    fn deal_with_increment(i: &str) -> IResult<&str, Self> {
+        let (i, _) = tag("deal with increment ")(i)?;
+        let (i, inc) = crate::helper::usize_val(i)?;
+        Ok((i, Self::DealWithIncrement(inc)))
+    }
+
+    fn cut(i: &str) -> IResult<&str, Self> {
+        let (i, _) = tag("cut ")(i)?;
+        let (i, cut) = crate::helper::i32_val(i)?;
+        Ok((i, Self::Cut(cut as isize)))
+    }
+}
+
+fn parse_techs(i: &str) -> IResult<&str, Vec<Tech>> {
+    separated_nonempty_list(newline, Tech::parse)(i)
+}
+
+type Deck = Vec<usize>;
+
+pub fn run() {
+    let input = fs::read_to_string("day22.txt").unwrap();
+    println!("22:1 {}", run_1(&input));
+    // println!("22:2 {}", run_2(11991, (6, 797)));
+}
+
+fn run_1(program: &str) -> usize {
+    let deck = run_with_deck(10007, program);
+
+    // 2019
+    let (idx, _) = deck
+        .iter()
+        .enumerate()
+        .find(|(i, v)| **v == 2019usize)
+        .unwrap();
+    idx
+}
+
+fn run_2() -> usize {
+    0
+}
+
+fn create_deck(num_cards: usize) -> Deck {
+    (0..num_cards).into_iter().collect()
+}
+
+fn cut(deck: &Deck, new_deck: &mut Deck, pos: isize) {
+    let pos = if pos >= 0 {
+        pos as usize
+    } else {
+        deck.len() - pos.abs() as usize
+    };
+
+    let (a, b) = deck.split_at(pos);
+    new_deck.clear();
+    new_deck.extend(b.iter());
+    new_deck.extend(a.iter());
+}
+
+fn deal_with_increment(deck: &Deck, new_deck: &mut Deck, inc: usize) {
+    let mut pos = 0;
+    for s in deck.iter() {
+        new_deck[pos] = *s;
+        pos = (pos + inc) % deck.len();
+    }
+}
+
+fn deal(deck: &Deck, new_deck: &mut Deck) {
+    new_deck.clear();
+    new_deck.extend(deck.iter().rev());
+}
+
+fn run_with_deck(deck_size: usize, program: &str) -> Deck {
+    let (_, techs) = parse_techs(program).unwrap();
+
+    let mut deck_a = create_deck(deck_size);
+    let mut deck_b = create_deck(deck_size);
+    let mut deck_idx = 0;
+
+    for t in techs {
+        let (deck, new_deck) = if deck_idx == 0 {
+            (&deck_a, &mut deck_b)
+        } else {
+            (&deck_b, &mut deck_a)
         };
 
-        let target = self.target;
-        let res = astar(
-            &start,
-            |n| self.next_region(n),
-            |n| State::distance_to_target(n, &target),
-            |n| n.pos == target,
-        );
+        match t {
+            Tech::Deal => deal(deck, new_deck),
+            Tech::DealWithIncrement(inc) => deal_with_increment(deck, new_deck, inc),
+            Tech::Cut(pos) => cut(deck, new_deck, pos),
+        }
 
-        // dbg! { &res };
-        res
+        deck_idx = (deck_idx + 1) % 2;
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct Node {
-    pos: Coord,
-    tool: Tool,
-}
-
-fn run_2(depth: usize, target: (usize, usize)) -> usize {
-    let mut state = State::new(depth, target);
-    let res = state.solve().unwrap();
-    res.1
+    if deck_idx == 0 {
+        deck_a
+    } else {
+        deck_b
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn aoc22_geologic_index() {
-        let map = create_map(11, 11);
-        let target = (10, 10);
-        assert_eq!(geologic_index(0, 0, &target, &map), 0);
-        assert_eq!(geologic_index(10, 10, &target, &map), 0);
+    fn aoc22_test_cut() {
+        let deck = create_deck(10);
+        let mut new_deck = deck.clone();
+        cut(&deck, &mut new_deck, 3);
+        assert_eq!(&new_deck, &[3, 4, 5, 6, 7, 8, 9, 0, 1, 2]);
+
+        cut(&deck, &mut new_deck, -4);
+        assert_eq!(&new_deck, &[6, 7, 8, 9, 0, 1, 2, 3, 4, 5]);
     }
 
     #[test]
-    fn aoc22_expand_map() {
-        let old_hw = 10;
-        let mut map = create_map(old_hw, old_hw);
-        assert_eq!(map.len(), old_hw);
-        assert_eq!(map[0].len(), old_hw);
-        expand_map(&mut map, &(10, 10), 510);
-        let new_hw = 4 * old_hw;
-        assert_eq!(map.len(), new_hw);
-        assert_eq!(map[0].len(), new_hw);
-        assert_eq!(map[10].len(), new_hw);
+    fn aoc22_test_deal() {
+        let deck = create_deck(10);
+        let mut new_deck = deck.clone();
+
+        deal(&deck, &mut new_deck);
+        assert_eq!(&new_deck, &[9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
+
+        deal_with_increment(&deck, &mut new_deck, 3);
+        assert_eq!(&new_deck, &[0, 7, 4, 1, 8, 5, 2, 9, 6, 3]);
     }
 
     #[test]
-    fn aoc22_test_1() {
-        assert_eq!(run_1(510, (10, 10)), 114);
-    }
+    fn aoc22_run_1() {
+        let deck = run_with_deck(
+            10,
+            "deal with increment 7
+deal into new stack
+deal into new stack",
+        );
+        assert_eq!(deck, &[0, 3, 6, 9, 2, 5, 8, 1, 4, 7]);
 
-    #[test]
-    fn aoc22_test_2() {
-        assert_eq!(run_2(510, (10, 10)), 45);
+        let deck = run_with_deck(
+            10,
+            "cut 6
+deal with increment 7
+deal into new stack",
+        );
+        assert_eq!(deck, &[3, 0, 7, 4, 1, 8, 5, 2, 9, 6]);
+
+        let deck = run_with_deck(
+            10,
+            "deal with increment 7
+deal with increment 9
+cut -2",
+        );
+        assert_eq!(deck, &[6, 3, 0, 7, 4, 1, 8, 5, 2, 9]);
+
+        let deck = run_with_deck(
+            10,
+            "deal into new stack
+cut -2
+deal with increment 7
+cut 8
+cut -4
+deal with increment 7
+cut 3
+deal with increment 9
+deal with increment 3
+cut -1",
+        );
+        assert_eq!(deck, &[9, 2, 5, 8, 1, 4, 7, 0, 3, 6]);
     }
 }
