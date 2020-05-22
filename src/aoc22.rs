@@ -43,23 +43,33 @@ type Deck = Vec<usize>;
 pub fn run() {
     let input = fs::read_to_string("day22.txt").unwrap();
     println!("22:1 {}", run_1(&input));
-    // println!("22:2 {}", run_2(11991, (6, 797)));
+    println!("22:2 {}", run_2(&input));
 }
 
 fn run_1(program: &str) -> usize {
-    let deck = run_with_deck(10007, program);
+    let deck = create_deck(10007);
+    let (_, techs) = parse_techs(program).unwrap();
+    let deck = run_with_deck(deck, &techs);
 
-    // 2019
     let (idx, _) = deck
         .iter()
         .enumerate()
-        .find(|(i, v)| **v == 2019usize)
+        .find(|(_, v)| **v == 2019usize)
         .unwrap();
     idx
 }
 
-fn run_2() -> usize {
-    0
+fn run_2(program: &str) -> usize {
+    let deck = create_deck(119315717514047);
+    let (_, techs) = parse_techs(program).unwrap();
+    let deck = run_with_deck(deck, &techs);
+
+    let (idx, _) = deck
+        .iter()
+        .enumerate()
+        .find(|(_, v)| **v == 2020usize)
+        .unwrap();
+    idx
 }
 
 fn create_deck(num_cards: usize) -> Deck {
@@ -92,11 +102,8 @@ fn deal(deck: &Deck, new_deck: &mut Deck) {
     new_deck.extend(deck.iter().rev());
 }
 
-fn run_with_deck(deck_size: usize, program: &str) -> Deck {
-    let (_, techs) = parse_techs(program).unwrap();
-
-    let mut deck_a = create_deck(deck_size);
-    let mut deck_b = create_deck(deck_size);
+fn run_with_deck(mut deck_a: Deck, techs: &[Tech]) -> Deck {
+    let mut deck_b = deck_a.clone();
     let mut deck_idx = 0;
 
     for t in techs {
@@ -108,8 +115,8 @@ fn run_with_deck(deck_size: usize, program: &str) -> Deck {
 
         match t {
             Tech::Deal => deal(deck, new_deck),
-            Tech::DealWithIncrement(inc) => deal_with_increment(deck, new_deck, inc),
-            Tech::Cut(pos) => cut(deck, new_deck, pos),
+            Tech::DealWithIncrement(inc) => deal_with_increment(deck, new_deck, *inc),
+            Tech::Cut(pos) => cut(deck, new_deck, *pos),
         }
 
         deck_idx = (deck_idx + 1) % 2;
@@ -150,32 +157,38 @@ mod tests {
 
     #[test]
     fn aoc22_run_1() {
-        let deck = run_with_deck(
-            10,
+        let (_, techs) = parse_techs(
             "deal with increment 7
 deal into new stack
 deal into new stack",
-        );
+        )
+        .unwrap();
+
+        let deck = create_deck(10);
+        let deck = run_with_deck(deck, &techs);
         assert_eq!(deck, &[0, 3, 6, 9, 2, 5, 8, 1, 4, 7]);
 
-        let deck = run_with_deck(
-            10,
+        let (_, techs) = parse_techs(
             "cut 6
 deal with increment 7
 deal into new stack",
-        );
+        )
+        .unwrap();
+        let deck = create_deck(10);
+        let deck = run_with_deck(deck, &techs);
         assert_eq!(deck, &[3, 0, 7, 4, 1, 8, 5, 2, 9, 6]);
 
-        let deck = run_with_deck(
-            10,
+        let (_, techs) = parse_techs(
             "deal with increment 7
 deal with increment 9
 cut -2",
-        );
+        )
+        .unwrap();
+        let deck = create_deck(10);
+        let deck = run_with_deck(deck, &techs);
         assert_eq!(deck, &[6, 3, 0, 7, 4, 1, 8, 5, 2, 9]);
 
-        let deck = run_with_deck(
-            10,
+        let (_, techs) = parse_techs(
             "deal into new stack
 cut -2
 deal with increment 7
@@ -186,7 +199,10 @@ cut 3
 deal with increment 9
 deal with increment 3
 cut -1",
-        );
+        )
+        .unwrap();
+        let deck = create_deck(10);
+        let deck = run_with_deck(deck, &techs);
         assert_eq!(deck, &[9, 2, 5, 8, 1, 4, 7, 0, 3, 6]);
     }
 }
