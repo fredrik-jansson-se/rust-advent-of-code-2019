@@ -1,6 +1,6 @@
 use nom::{
-    branch::alt, bytes::complete::tag, character::complete::newline,
-    multi::separated_nonempty_list, IResult,
+    branch::alt, bytes::complete::tag, character::complete::newline, multi::separated_list1,
+    IResult,
 };
 use std::fs;
 
@@ -35,7 +35,7 @@ impl Tech {
 }
 
 fn parse_techs(i: &str) -> IResult<&str, Vec<Tech>> {
-    separated_nonempty_list(newline, Tech::parse)(i)
+    separated_list1(newline, Tech::parse)(i)
 }
 
 type Deck = Vec<usize>;

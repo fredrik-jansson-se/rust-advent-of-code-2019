@@ -1,7 +1,7 @@
 use nom::{
     bytes::complete::tag,
     character::complete::{alpha1, newline, space1},
-    multi::separated_nonempty_list,
+    multi::separated_list1,
     sequence::separated_pair,
     IResult,
 };
@@ -15,111 +15,135 @@ const ORE: &str = "ORE";
 pub fn run() {
     let input = fs::read_to_string("day14.txt").unwrap();
     println!("14:1 {}", run_1(&input));
-    // println!("13:2 {}", run_2(&input));
+    println!("14:2 {}", run_2(&input));
 }
 
-fn ingredients_to(target: &str, reactions: &[Reaction], current: &Quantity) -> u32 {
-    if target == current.1 {
-        current.0
-    } else {
-        // dbg! {&reactions};
-        // dbg! {current};
-        let reaction: &Reaction = reactions
-            .iter()
-            .find(|(_, (_, name))| *name == current.1)
-            .unwrap();
-        dbg! {reaction};
-
-        let ingredients: u32 = reaction
-            .0
-            .iter()
-            .map(|r| ingredients_to(target, reactions, r))
-            .sum();
-        current.0 * ingredients
-    }
-}
-
-fn run_1(input: &str) -> u32 {
+fn run_1(input: &str) -> u64 {
     let (_, reactions) = parse(input).unwrap();
 
-    let mut needed_to_produce = produce(1, FUEL, &reactions);
-    let mut num_ore = 0;
+    let mut produced = HashMap::new();
+    produce(1, FUEL, &reactions, &mut produced);
 
-    while !needed_to_produce.is_empty() {
-        dbg! {&needed_to_produce};
-        let mut new_to_produce = Vec::new();
-
-        for (n, q) in needed_to_produce {
-            println!("{}: {}", n, q);
-            if n == ORE {
-                num_ore += q;
-                continue;
-            }
-
-            new_to_produce.append(&mut produce(q, &n, &reactions));
-        }
-
-        needed_to_produce = new_to_produce;
-    }
-
-    println!("num_ore: {}", num_ore);
-
-    num_ore
+    *produced.get(ORE).unwrap()
 }
 
-type Quantity<'a> = (u32, &'a str);
+fn run_2(input: &str) -> u64 {
+    let (_, reactions) = parse(input).unwrap();
+
+    let mut max_cur_fuel = 1;
+    let max_ore = 1000000000000;
+
+    let mut produced = HashMap::new();
+    loop {
+        produced.clear();
+        max_cur_fuel *= 2;
+        produce(max_cur_fuel, FUEL, &reactions, &mut produced);
+        if produced.get(ORE).unwrap() > &max_ore {
+            break;
+        }
+    }
+    let mut min_cur_fuel = max_cur_fuel / 2;
+    while (max_cur_fuel - min_cur_fuel) > 1 {
+        produced.clear();
+        let middle = (min_cur_fuel + max_cur_fuel) / 2;
+        produce(middle, FUEL, &reactions, &mut produced);
+        if produced.get(ORE).unwrap() > &max_ore {
+            max_cur_fuel = middle;
+        } else {
+            min_cur_fuel = middle;
+        }
+    }
+    min_cur_fuel
+}
+type Quantity<'a> = (u64, &'a str);
 
 fn parse_chemical(i: &str) -> IResult<&str, Quantity> {
-    separated_pair(crate::helper::u32_val, space1, alpha1)(i)
+    separated_pair(
+        nom::combinator::map(crate::helper::u32_val, |v| v as u64),
+        space1,
+        alpha1,
+    )(i)
 }
 
 type Reaction<'a> = (Vec<Quantity<'a>>, Quantity<'a>);
 
 #[derive(Debug, Clone)]
 struct Output {
-    input_quantity: u32,
-    output: Vec<(String, u32)>,
+    output_quantity: u64,
+    inputs: Vec<(String, u64)>,
 }
 
 fn parse_reaction(i: &str) -> IResult<&str, Reaction> {
-    let (i, input) = separated_nonempty_list(tag(", "), parse_chemical)(i)?;
+    let (i, input) = separated_list1(tag(", "), parse_chemical)(i)?;
+
+    // Get all input quantities;
+    let mut quantities: Vec<u64> = input.iter().map(|q| q.0).collect();
+
     let (i, _) = tag(" => ")(i)?;
     let (i, output) = parse_chemical(i)?;
+
+    // Add output quantity
+    quantities.push(output.0);
+
+    let input = input.iter().map(|i| (i.0, i.1)).collect();
+    let output = (output.0, output.1);
     Ok((i, (input, output)))
 }
 
 type Reactions = HashMap<String, Output>;
 
 fn parse(i: &str) -> IResult<&str, Reactions> {
-    let (i, reactions) = separated_nonempty_list(newline, parse_reaction)(i)?;
+    let (i, reactions) = separated_list1(newline, parse_reaction)(i)?;
 
     let mut h = HashMap::new();
 
-    for (outputs, input) in reactions {
-        let (input_quantity, input_name) = input;
+    for (inputs, output) in reactions {
+        assert!(!h.contains_key(&output.1.to_owned()));
 
-        h.insert(
-            input_name.to_owned(),
-            Output {
-                input_quantity,
-                output: outputs.iter().map(|(q, n)| (n.to_string(), *q)).collect(),
-            },
-        );
+        let o = Output {
+            output_quantity: output.0,
+            inputs: inputs
+                .iter()
+                .map(|(q, name)| (name.to_string(), *q))
+                .collect(),
+        };
+
+        h.insert(output.1.to_string(), o);
     }
 
     Ok((i, h))
 }
+type Produced = HashMap<String, u64>;
 
-fn produce(q: u32, name: &str, r: &Reactions) -> Vec<(String, u32)> {
-    let output = r.get(name).unwrap();
+fn produce(q: u64, name: &str, r: &Reactions, produced: &mut Produced) {
+    let q = {
+        let already_produced = produced.entry(name.to_string()).or_insert(0);
 
-    let multiplier = (q as f32 / output.input_quantity as f32).ceil() as u32;
+        // do we have extra material already produced?
+        if q <= *already_produced {
+            *already_produced -= q;
+            return;
+        }
 
-    output
-        .output
-        .iter()
-        .map(|(name, q_o)| (name.clone(), multiplier * q_o))
-        .collect()
+        let q = q - *already_produced;
+        *already_produced = 0;
+        q
+    };
+
+    let reaction = r.get(name).unwrap();
+
+    let num_reactions = (q as f64 / reaction.output_quantity as f64).ceil() as u64;
+
+    for (name, q) in reaction.inputs.iter() {
+        if name == ORE {
+            *produced.entry(ORE.to_string()).or_insert(0) += q * num_reactions;
+        } else {
+            produce(q * num_reactions, name, r, produced);
+        }
+    }
+    let already_produced = produced.entry(name.to_string()).or_insert(0);
+    // dbg! {(&num_reactions,reaction.output_quantity, &q)};
+    *already_produced += num_reactions * reaction.output_quantity - q;
 }
 
 #[cfg(test)]
@@ -132,18 +156,42 @@ mod tests {
         let (_, (input, output)) = parse_reaction("2 AB, 3 BC, 4 CA => 1 FUEL").unwrap();
         assert_eq!(input.len(), 3);
         assert_eq!(input[0], (2, "AB"));
+        assert_eq!(input[1], (3, "BC"));
         assert_eq!(output, (1, "FUEL"));
+
+        let (_, (input, output)) = parse_reaction("114 ORE => 4 BHXH").unwrap();
+        assert_eq!(input.len(), 1);
+        assert_eq!(input[0], (114, "ORE"));
+        assert_eq!(output, (4, "BHXH"));
+
+        let (_, (input, output)) = parse_reaction("10 ZJFM, 4 MVSHM => 8 LCDPV").unwrap();
+        assert_eq!(input.len(), 2);
+        assert_eq!(input[0], (10, "ZJFM"));
+        assert_eq!(input[1], (4, "MVSHM"));
+        assert_eq!(output, (8, "LCDPV"));
     }
-
     #[test]
-    fn aoc14_ingredients() {
-        use super::*;
-        let (_, (input, output)) = parse_reaction("2 AB, 3 BC, 4 CA => 1 FUEL").unwrap();
+    fn aoc14_produce() {
+        //
+        let (_, reactions) = super::parse(
+            r#"10 ORE => 10 A
+1 ORE => 1 B
+7 A, 1 B => 1 C
+7 A, 1 C => 1 D
+7 A, 1 D => 1 E
+7 A, 1 E => 1 FUEL"#,
+        )
+        .unwrap();
 
-        assert_eq!(
-            ingredients_to("AB", &vec![(input, output)], &(1, "FUEL")),
-            2
-        );
+        let mut produced = std::collections::HashMap::new();
+        super::produce(30, "A", &reactions, &mut produced);
+        assert_eq!(produced.get("ORE"), Some(&30));
+        assert_eq!(produced.get("A"), Some(&0));
+
+        let mut produced = std::collections::HashMap::new();
+        super::produce(25, "A", &reactions, &mut produced);
+        assert_eq!(produced.get("ORE"), Some(&30));
+        assert_eq!(produced.get("A"), Some(&5));
     }
 
     #[test]
@@ -232,33 +280,63 @@ mod tests {
     }
 
     #[test]
-    fn aoc14_produce() {
-        let input = r#"9 ORE => 2 A
-8 ORE => 3 B
-7 ORE => 5 C
-3 A, 4 B => 1 AB
-5 B, 7 C => 1 BC
-4 C, 1 A => 1 CA
-2 AB, 3 BC, 4 CA => 1 FUEL"#;
-
-        let (_, reactions) = super::parse(&input).unwrap();
-
-        let fuel_1 = super::produce(1, "FUEL", &reactions);
-        assert!(fuel_1.iter().any(|(n, q)| n == "AB" && *q == 2));
-        assert!(fuel_1.iter().any(|(n, q)| n == "BC" && *q == 3));
-        assert!(fuel_1.iter().any(|(n, q)| n == "CA" && *q == 4));
-
-        let bc_3 = super::produce(3, "BC", &reactions);
-
-        assert!(bc_3.iter().any(|(n, q)| n == "B" && *q == 15));
-        assert!(bc_3.iter().any(|(n, q)| n == "C" && *q == 2));
-    }
-
-    #[test]
     fn aoc14_run_2() {
-        // assert_eq!(9, run_2(51589));
-        // assert_eq!(6, run_2(01245));
-        // assert_eq!(18, run_2(92510));
-        // assert_eq!(2018, run_2(59414));
+        use super::*;
+
+        assert_eq!(
+            run_2(
+                r#"157 ORE => 5 NZVS
+165 ORE => 6 DCFZ
+44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
+12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
+179 ORE => 7 PSHF
+177 ORE => 5 HKGWZ
+7 DCFZ, 7 PSHF => 2 XJWVT
+165 ORE => 2 GPVTF
+3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT"#
+            ),
+            82892753
+        );
+
+        assert_eq!(
+            run_2(
+                r#"2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
+17 NVRVD, 3 JNWZP => 8 VPVL
+53 STKFG, 6 MNCFX, 46 VJHF, 81 HVMC, 68 CXFTF, 25 GNMV => 1 FUEL
+22 VJHF, 37 MNCFX => 5 FWMGM
+139 ORE => 4 NVRVD
+144 ORE => 7 JNWZP
+5 MNCFX, 7 RFSQX, 2 FWMGM, 2 VPVL, 19 CXFTF => 3 HVMC
+5 VJHF, 7 MNCFX, 9 VPVL, 37 CXFTF => 6 GNMV
+145 ORE => 6 MNCFX
+1 NVRVD => 8 CXFTF
+1 VJHF, 6 MNCFX => 4 RFSQX
+176 ORE => 6 VJHF"#
+            ),
+            5586022
+        );
+
+        assert_eq!(
+            run_2(
+                r#"171 ORE => 8 CNZTR
+7 ZLQW, 3 BMBT, 9 XCVML, 26 XMNCP, 1 WPTQ, 2 MZWV, 1 RJRHP => 4 PLWSL
+114 ORE => 4 BHXH
+14 VRPVC => 6 BMBT
+6 BHXH, 18 KTJDG, 12 WPTQ, 7 PLWSL, 31 FHTLT, 37 ZDVW => 1 FUEL
+6 WPTQ, 2 BMBT, 8 ZLQW, 18 KTJDG, 1 XMNCP, 6 MZWV, 1 RJRHP => 6 FHTLT
+15 XDBXC, 2 LTCX, 1 VRPVC => 6 ZLQW
+13 WPTQ, 10 LTCX, 3 RJRHP, 14 XMNCP, 2 MZWV, 1 ZLQW => 1 ZDVW
+5 BMBT => 4 WPTQ
+189 ORE => 9 KTJDG
+1 MZWV, 17 XDBXC, 3 XCVML => 2 XMNCP
+12 VRPVC, 27 CNZTR => 2 XDBXC
+15 KTJDG, 12 BHXH => 5 XCVML
+3 BHXH, 2 VRPVC => 7 MZWV
+121 ORE => 7 VRPVC
+7 XCVML => 6 RJRHP
+5 BHXH, 4 VRPVC => 5 LTCX"#
+            ),
+            460664
+        );
     }
 }

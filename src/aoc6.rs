@@ -1,6 +1,6 @@
 use nom::bytes::complete::tag;
 use nom::character::complete::{alphanumeric1, newline};
-use nom::multi::separated_nonempty_list;
+use nom::multi::separated_list1;
 use nom::sequence::separated_pair;
 use nom::IResult;
 use std::collections::{HashMap, HashSet};
@@ -130,7 +130,7 @@ fn run_2(input: &str) -> usize {
 }
 
 fn parse(i: &str) -> IResult<&str, Vec<(&str, &str)>> {
-    separated_nonempty_list(
+    separated_list1(
         newline,
         separated_pair(alphanumeric1, tag(")"), alphanumeric1),
     )(i)

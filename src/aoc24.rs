@@ -4,7 +4,7 @@ use std::fs;
 pub fn run() {
     let input = fs::read_to_string("day24.txt").unwrap();
     println!("24:1 {}", run_1(&input));
-    // 37688562
+    println!("24:2 {}", run_2(&input));
 }
 
 fn parse(input: &str) -> (HashSet<(usize, usize)>, usize) {

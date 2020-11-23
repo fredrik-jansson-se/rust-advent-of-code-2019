@@ -1,4 +1,4 @@
-// use rayon::prelude::*;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs;
 
@@ -30,15 +30,22 @@ const BASE_PATTERN: [isize; 4] = [0, 1, 0, -1];
 fn pattern_for_pos(pos: usize, input_len: usize) -> Vec<isize> {
     let mut res = Vec::with_capacity(pos * BASE_PATTERN.len());
 
+    let mut first = true;
     while res.len() < input_len {
         for v in BASE_PATTERN.iter() {
             for _ in 0..pos {
-                res.push(*v);
+                if first {
+                    first = false;
+                } else {
+                    res.push(*v);
+                }
             }
         }
     }
 
-    res.into_iter().skip(1).take(input_len).collect()
+    // res.into_iter().skip(1).take(input_len).collect()
+    res.resize(input_len, 0);
+    res
 }
 
 fn pattern(pos: usize, input_len: usize, lookup: &mut HashMap<usize, Vec<isize>>) -> &[isize] {
@@ -90,11 +97,11 @@ fn run_2(input: &str, _iterations: usize, digits: usize) -> Vec<isize> {
         }
     }
 
-    // let mut lookup = Vec::with_capacity(input.len());
-    // (0..input.len())
-    //     .into_par_iter()
-    //     .map(|i| pattern_for_pos(i + 1, input.len()))
-    //     .collect_into_vec(&mut lookup);
+    let mut lookup = Vec::with_capacity(input.len());
+    (0..input.len())
+        .into_par_iter()
+        .map(|i| pattern_for_pos(i + 1, input.len()))
+        .collect_into_vec(&mut lookup);
     // for i in 0..input.len() {
     //     lookup.push(pattern_for_pos(i + 1, lookup.len()));
     // }
@@ -182,19 +189,17 @@ mod tests {
 
     #[test]
     fn aoc16_run_2() {
-        use super::*;
-
         assert_eq!(
-            run_2("03036732577212944063491565474664", 100, 8),
-            parse("84462026").unwrap().1
+            super::run_2("03036732577212944063491565474664", 100, 8),
+            super::parse("84462026").unwrap().1
         );
         assert_eq!(
-            run_2("02935109699940807407585447034323", 100, 8),
-            parse("78725270").unwrap().1
+            super::run_2("02935109699940807407585447034323", 100, 8),
+            super::parse("78725270").unwrap().1
         );
         assert_eq!(
-            run_2("03081770884921959731165446850517", 100, 8),
-            parse("53553731").unwrap().1
+            super::run_2("03081770884921959731165446850517", 100, 8),
+            super::parse("53553731").unwrap().1
         );
     }
 }

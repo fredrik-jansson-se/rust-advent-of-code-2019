@@ -3,7 +3,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::newline;
 use nom::combinator::map;
-use nom::multi::separated_nonempty_list;
+use nom::multi::separated_list1;
 use nom::sequence::preceded;
 use nom::IResult;
 use std::fs;
@@ -29,11 +29,11 @@ fn parse_wire(i: &str) -> IResult<&str, Vec<Direction>> {
     let down = map(preceded(tag("D"), usize_val), Direction::Down);
     let left = map(preceded(tag("L"), usize_val), Direction::Left);
     let right = map(preceded(tag("R"), usize_val), Direction::Right);
-    separated_nonempty_list(tag(","), alt((up, down, left, right)))(i)
+    separated_list1(tag(","), alt((up, down, left, right)))(i)
 }
 
 fn parse(i: &str) -> IResult<&str, Vec<Vec<Direction>>> {
-    separated_nonempty_list(newline, parse_wire)(i)
+    separated_list1(newline, parse_wire)(i)
 }
 
 #[derive(Clone, Debug, PartialEq)]

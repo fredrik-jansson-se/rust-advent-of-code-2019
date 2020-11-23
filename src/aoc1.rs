@@ -1,6 +1,6 @@
 use super::helper::*;
 use nom::character::complete::newline;
-use nom::multi::separated_nonempty_list;
+use nom::multi::separated_list1;
 use nom::*;
 use std::fs;
 
@@ -30,7 +30,7 @@ fn fuel_2(mass: &usize) -> usize {
 }
 
 fn parse_input(i: &str) -> IResult<&str, Vec<usize>> {
-    separated_nonempty_list(newline, usize_val)(i)
+    separated_list1(newline, usize_val)(i)
 }
 
 fn run_1(input: &str) -> usize {

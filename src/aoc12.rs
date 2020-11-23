@@ -2,8 +2,8 @@ use crate::helper::*;
 use std::fs;
 
 use nom::{
-    bytes::complete::tag, character::complete::newline, combinator::map,
-    multi::separated_nonempty_list, IResult,
+    bytes::complete::tag, character::complete::newline, combinator::map, multi::separated_list1,
+    IResult,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -43,7 +43,7 @@ fn pull(a: i32, b: i32) -> (i32, i32) {
 impl Moon {
     fn new(pos: Vec3) -> Self {
         Moon {
-            pos: pos,
+            pos,
             vel: Vec3 { x: 0, y: 0, z: 0 },
         }
     }
@@ -70,13 +70,13 @@ impl Moon {
         self.pos.x.abs() + self.pos.y.abs() + self.pos.z.abs()
     }
 
-    fn kinetic_energe(&self) -> i32 {
+    fn kinetic_energy(&self) -> i32 {
         self.vel.x.abs() + self.vel.y.abs() + self.vel.z.abs()
     }
 }
 
 fn parse(i: &str) -> IResult<&str, Vec<Moon>> {
-    separated_nonempty_list(newline, map(parse_vec3, Moon::new))(i)
+    separated_list1(newline, map(parse_vec3, Moon::new))(i)
 }
 
 pub fn run() {
@@ -99,7 +99,7 @@ fn run_1(input: &str, steps: usize) -> i32 {
 
     moons
         .iter()
-        .map(|m| m.kinetic_energe() * m.potential_energy())
+        .map(|m| m.kinetic_energy() * m.potential_energy())
         .sum()
 }
 

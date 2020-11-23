@@ -1,8 +1,8 @@
 use super::helper::*;
-use nom::{bytes::complete::tag, multi::separated_nonempty_list, IResult};
+use nom::{bytes::complete::tag, multi::separated_list1, IResult};
 
 fn parse_program(i: &str) -> IResult<&str, Vec<i64>> {
-    separated_nonempty_list(tag(","), i64_val)(i)
+    separated_list1(tag(","), i64_val)(i)
 }
 
 #[derive(Debug, PartialEq)]
